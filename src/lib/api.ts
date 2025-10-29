@@ -55,13 +55,20 @@ export const usersApi = {
 // Portfolio API
 export const portfolioApi = {
   getPortfolio: () => api.get('/portfolio'),
+  syncPortfolio: () => api.post('/portfolio/sync'),
 };
 
 // Exchanges API
 export const exchangesApi = {
-  connect: () => api.post('/exchanges/connect'),
+  getList: () => api.get('/exchanges/list'),
+  connect: (exchangeId: string, apiKey: string, apiSecret: string) => 
+    api.post('/exchanges/connect', { exchangeId, apiKey, apiSecret }),
   sync: () => api.post('/exchanges/sync'),
   getPortfolio: () => api.get('/exchanges/portfolio'),
+  getConnectedExchanges: () => api.get('/exchanges/connected'),
+  disconnect: (exchangeId: string) => api.delete(`/exchanges/${exchangeId}`),
+  updateKeys: (exchangeId: string, apiKey: string, apiSecret: string) => 
+    api.put(`/exchanges/${exchangeId}`, { apiKey, apiSecret }),
 };
 
 // Profiling API
