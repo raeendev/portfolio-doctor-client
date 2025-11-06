@@ -18,6 +18,9 @@ export default function LoginPage() {
   
   const { login } = useAuth();
   const router = useRouter();
+  const isDev = process.env.NODE_ENV !== 'production';
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@example.com';
+  const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'Admin@12345';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +31,22 @@ export default function LoginPage() {
       await login(email, password);
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+      const errorMessage = err.message || err.response?.data?.detail || err.response?.data?.message || 'Login failed. Please check your credentials.';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickAdminLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await login(adminEmail, adminPassword);
+      router.push('/dashboard');
+    } catch (err: any) {
+      const errorMessage = err.message || err.response?.data?.detail || err.response?.data?.message || 'Quick login failed.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -128,6 +146,17 @@ export default function LoginPage() {
               >
                 {loading ? 'Signing in...' : 'Sign in'}
               </Button>
+              {isDev && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full mt-2"
+                  onClick={handleQuickAdminLogin}
+                  disabled={loading}
+                >
+                  {loading ? 'Please wait...' : 'Quick login as Admin'}
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>

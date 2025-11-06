@@ -51,9 +51,14 @@ export function ExchangeConnectionModal({
 
     try {
       await onConnect(exchange.id, apiKey, apiSecret);
+      setApiKey('');
+      setApiSecret('');
+      setErrors({});
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Connection failed:', error);
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to connect exchange. Please try again.';
+      setErrors({ general: errorMessage });
     }
   };
 
@@ -84,7 +89,7 @@ export function ExchangeConnectionModal({
           </Button>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+          <CardContent className="space-y-4">
           <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
             <div className="text-2xl">{exchange.icon}</div>
             <div>
@@ -92,6 +97,15 @@ export function ExchangeConnectionModal({
               <p className="text-sm text-gray-600">{exchange.description}</p>
             </div>
           </div>
+
+          {errors.general && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+              <div className="flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                {errors.general}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4">
             <div>
@@ -188,6 +202,7 @@ export function ExchangeConnectionModal({
                   Connect Exchange
                 </>
               )}
+              
             </Button>
           </div>
         </CardContent>

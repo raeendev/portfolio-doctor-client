@@ -5,23 +5,21 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ExchangeList, Exchange } from '@/components/ExchangeList';
 import { ExchangeConnectionModal } from '@/components/ExchangeConnectionModal';
-import { ExchangeManagement } from '@/components/ExchangeManagement';
-import { UpdateExchangeModal } from '@/components/UpdateExchangeModal';
+import { ImportTradeData } from '@/components/ImportTradeData';
 import { exchangesApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, Settings } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, X } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 export default function ExchangesPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(null);
   const [connectedExchanges, setConnectedExchanges] = useState<string[]>([]);
-  const [connectedExchangesDetails, setConnectedExchangesDetails] = useState<any[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [editingExchange, setEditingExchange] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'connect' | 'manage'>('connect');
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -38,21 +36,23 @@ export default function ExchangesPage() {
   const loadConnectedExchanges = async () => {
     try {
       const response = await exchangesApi.getConnectedExchanges();
-      setConnectedExchanges(response.data.exchanges);
+      // Handle response format: {exchanges: [{exchange: "...", createdAt: "..."}]}
+      const exchangesData = response.data.exchanges || [];
       
-      // For now, create mock details - in production, this would come from a detailed endpoint
-      const details = response.data.exchanges.map((exchange: string) => ({
-        exchange,
-        createdAt: new Date().toISOString(),
-        id: `mock-${exchange}`,
-      }));
-      setConnectedExchangesDetails(details);
+      // Extract exchange names (IDs)
+      const exchanges = exchangesData.map((ex: any) => 
+        typeof ex === 'string' ? ex : ex.exchange || ex.id || ex
+      );
+      setConnectedExchanges(exchanges);
     } catch (error) {
       console.error('Failed to load connected exchanges:', error);
+      setConnectedExchanges([]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const handleSelectExchange = (exchange: Exchange) => {
     if (exchange.status === 'available') {
@@ -62,38 +62,41 @@ export default function ExchangesPage() {
 
   const handleConnectExchange = async (exchangeId: string, apiKey: string, apiSecret: string) => {
     setIsConnecting(true);
+    setConnectError(null);
     try {
       await exchangesApi.connect(exchangeId, apiKey, apiSecret);
-      await loadConnectedExchanges();
+      await loadConnectedExchanges(); // Refresh connected exchanges list
       setSelectedExchange(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to connect exchange:', error);
-      // TODO: Show error message to user
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to connect exchange. Please try again.';
+      setConnectError(errorMessage);
     } finally {
       setIsConnecting(false);
     }
   };
 
+  const handleDisconnectExchange = async (exchangeId: string) => {
+    try {
+      await exchangesApi.disconnect(exchangeId);
+      await loadConnectedExchanges(); // Refresh connected exchanges list
+    } catch (error: any) {
+      console.error('Failed to disconnect exchange:', error);
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to disconnect exchange. Please try again.';
+      setConnectError(errorMessage);
+      throw error; // Re-throw to let ExchangeList handle it
+    }
+  };
+
   const handleCloseModal = () => {
     setSelectedExchange(null);
-  };
-
-  const handleEditExchange = (exchangeId: string) => {
-    setEditingExchange(exchangeId);
-  };
-
-  const handleCloseEditModal = () => {
-    setEditingExchange(null);
-  };
-
-  const handleExchangeUpdated = () => {
-    loadConnectedExchanges();
+    setConnectError(null);
   };
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center transition-colors">
+        <div className="animate-spin rounded-full h-32 w-32 border-4 border-[var(--primary)] border-t-transparent"></div>
       </div>
     );
   }
@@ -103,11 +106,11 @@ export default function ExchangesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors">
       <Navigation currentPage="exchanges" />
       
       {/* Page Header */}
-      <div className="bg-white border-b">
+      <div className="bg-[var(--nav-bg)] border-b border-[var(--nav-border)] backdrop-blur-sm bg-opacity-95 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
@@ -115,19 +118,19 @@ export default function ExchangesPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push('/dashboard')}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 bg-transparent border-[var(--card-border)] text-[var(--foreground)] hover:bg-[var(--card-hover)]"
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span>Back to Dashboard</span>
               </Button>
-              <div className="h-6 w-px bg-gray-300" />
-              <h1 className="text-xl font-semibold text-gray-900">Exchange Management</h1>
+              <div className="h-6 w-px bg-[var(--nav-border)]" />
+              <h1 className="text-xl font-semibold text-[var(--foreground)]">Exchange Management</h1>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={loadConnectedExchanges}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--foreground)] hover:bg-[var(--card-hover)]"
             >
               <RefreshCw className="h-4 w-4" />
               <span>Refresh</span>
@@ -137,50 +140,30 @@ export default function ExchangesPage() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Tab Navigation */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('connect')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'connect'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Connect New Exchange
-              </button>
-              <button
-                onClick={() => setActiveTab('manage')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'manage'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Settings className="h-4 w-4 inline mr-2" />
-                Manage Connected Exchanges
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === 'connect' ? (
-          <ExchangeList
-            onSelectExchange={handleSelectExchange}
-            connectedExchanges={connectedExchanges}
-          />
-        ) : (
-          <ExchangeManagement
-            connectedExchanges={connectedExchangesDetails}
-            onRefresh={loadConnectedExchanges}
-            onUpdate={handleExchangeUpdated}
-            onEdit={handleEditExchange}
-          />
-        )}
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Trade History Import & Analysis CTA */}
+        <Card className="bg-[var(--card-bg)] border-[var(--card-border)]">
+          <CardHeader>
+            <CardTitle className="text-[var(--foreground)]">Trade History Analysis</CardTitle>
+            <CardDescription className="text-[var(--text-muted)]">Upload and analyze your trade history in the Analytics section</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => router.push('/analytics/trades')}
+              className="bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] hover:from-[#2563eb] hover:to-[#7c3aed] text-white"
+            >
+              Go to Trade Analysis
+            </Button>
+          </CardContent>
+        </Card>
+        
+        {/* Exchange List */}
+        <ExchangeList
+          onSelectExchange={handleSelectExchange}
+          connectedExchanges={connectedExchanges}
+          onDisconnect={handleDisconnectExchange}
+          onRefresh={loadConnectedExchanges}
+        />
       </main>
 
       {/* Connection Modal */}
@@ -190,14 +173,23 @@ export default function ExchangesPage() {
         onConnect={handleConnectExchange}
         isConnecting={isConnecting}
       />
-
-      {/* Update Exchange Modal */}
-      {editingExchange && (
-        <UpdateExchangeModal
-          exchangeId={editingExchange}
-          onClose={handleCloseEditModal}
-          onUpdate={handleExchangeUpdated}
-        />
+      
+      {/* Error Alert */}
+      {connectError && (
+        <div className="fixed top-20 right-4 px-4 py-3 rounded-md shadow-lg z-50 max-w-md bg-[var(--danger)]/20 border border-[var(--danger)] text-[var(--danger)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              <span>{connectError}</span>
+            </div>
+            <button
+              onClick={() => setConnectError(null)}
+              className="ml-4 hover:opacity-80"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -25,6 +25,8 @@ export function ExchangeManagement({ connectedExchanges, onRefresh, onUpdate, on
   const [deletingExchange, setDeletingExchange] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
+
   const handleDisconnect = async (exchangeId: string) => {
     if (!confirm(`Are you sure you want to disconnect ${exchangeId}?`)) {
       return;
@@ -32,15 +34,21 @@ export function ExchangeManagement({ connectedExchanges, onRefresh, onUpdate, on
 
     try {
       setIsLoading(true);
+      setDisconnectError(null);
       await exchangesApi.disconnect(exchangeId);
       onRefresh();
       onUpdate();
-    } catch (error) {
+      setDeletingExchange(null);
+    } catch (error: any) {
       console.error('Failed to disconnect exchange:', error);
-      alert('Failed to disconnect exchange');
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to disconnect exchange. Please try again.';
+      setDisconnectError(errorMessage);
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
-      setDeletingExchange(null);
+      if (!disconnectError) {
+        setDeletingExchange(null);
+      }
     }
   };
 

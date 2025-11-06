@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Check, ExternalLink, Shield, Zap, Globe } from 'lucide-react';
+import { Plus, Check, ExternalLink, Shield, Zap, Globe, RefreshCw, X, Loader2 } from 'lucide-react';
+import { exchangesApi } from '@/lib/api';
 
 export interface Exchange {
   id: string;
@@ -22,91 +23,61 @@ export interface Exchange {
   };
 }
 
-const availableExchanges: Exchange[] = [
-  {
-    id: 'lbank',
-    name: 'LBank',
-    description: 'Global cryptocurrency exchange with advanced trading features',
-    status: 'available',
-    features: ['Spot Trading', 'Futures Trading', 'Staking', 'High Liquidity'],
-    icon: '🏦',
-    website: 'https://www.lbank.com',
-    supportedFeatures: {
-      spot: true,
-      futures: true,
-      margin: false,
-      staking: true,
-    },
-  },
-  {
-    id: 'binance',
-    name: 'Binance',
-    description: 'World\'s largest cryptocurrency exchange by trading volume',
-    status: 'coming_soon',
-    features: ['Spot Trading', 'Futures Trading', 'Margin Trading', 'Staking', 'NFT Marketplace'],
-    icon: '🟡',
-    website: 'https://www.binance.com',
-    supportedFeatures: {
-      spot: true,
-      futures: true,
-      margin: true,
-      staking: true,
-    },
-  },
-  {
-    id: 'coinbase',
-    name: 'Coinbase',
-    description: 'Leading US-based cryptocurrency exchange and wallet',
-    status: 'coming_soon',
-    features: ['Spot Trading', 'Staking', 'Institutional Services', 'NFT Marketplace'],
-    icon: '🔵',
-    website: 'https://www.coinbase.com',
-    supportedFeatures: {
-      spot: true,
-      futures: false,
-      margin: false,
-      staking: true,
-    },
-  },
-  {
-    id: 'kraken',
-    name: 'Kraken',
-    description: 'Secure and reliable cryptocurrency exchange since 2011',
-    status: 'coming_soon',
-    features: ['Spot Trading', 'Futures Trading', 'Margin Trading', 'Staking'],
-    icon: '🦑',
-    website: 'https://www.kraken.com',
-    supportedFeatures: {
-      spot: true,
-      futures: true,
-      margin: true,
-      staking: true,
-    },
-  },
-  {
-    id: 'okx',
-    name: 'OKX',
-    description: 'Global cryptocurrency exchange with comprehensive trading tools',
-    status: 'coming_soon',
-    features: ['Spot Trading', 'Futures Trading', 'Margin Trading', 'Options', 'Staking'],
-    icon: '⚡',
-    website: 'https://www.okx.com',
-    supportedFeatures: {
-      spot: true,
-      futures: true,
-      margin: true,
-      staking: true,
-    },
-  },
-];
-
 interface ExchangeListProps {
   onSelectExchange: (exchange: Exchange) => void;
   connectedExchanges?: string[];
+  onDisconnect?: (exchangeId: string) => Promise<void>;
+  onRefresh?: () => void;
 }
 
-export function ExchangeList({ onSelectExchange, connectedExchanges = [] }: ExchangeListProps) {
-  const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(null);
+export function ExchangeList({ 
+  onSelectExchange, 
+  connectedExchanges = [], 
+  onDisconnect,
+  onRefresh 
+}: ExchangeListProps) {
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [disconnectingExchange, setDisconnectingExchange] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadExchanges();
+  }, []);
+
+  const loadExchanges = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await exchangesApi.getList();
+      
+      // Map API response to Exchange format
+      const mappedExchanges: Exchange[] = response.data.exchanges.map((ex: any) => ({
+        id: ex.id,
+        name: ex.name,
+        description: ex.description,
+        status: ex.status as 'available' | 'coming_soon' | 'maintenance',
+        features: ex.features || [],
+        icon: ex.icon || '📊',
+        website: ex.website || '#',
+        supportedFeatures: ex.supportedFeatures || {
+          spot: false,
+          futures: false,
+          margin: false,
+          staking: false,
+        },
+      }));
+      
+      setExchanges(mappedExchanges);
+    } catch (error) {
+      console.error('Failed to load exchanges:', error);
+      setError('Failed to load exchanges. Please try again.');
+      // Fallback to empty array
+      setExchanges([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusBadge = (status: Exchange['status']) => {
     switch (status) {
@@ -136,6 +107,59 @@ export function ExchangeList({ onSelectExchange, connectedExchanges = [] }: Exch
     }
   };
 
+  const handleDisconnect = async (exchangeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to disconnect ${exchangeId}?`)) {
+      return;
+    }
+
+    try {
+      setDisconnectingExchange(exchangeId);
+      if (onDisconnect) {
+        await onDisconnect(exchangeId);
+      }
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error: any) {
+      console.error('Failed to disconnect exchange:', error);
+      alert(error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to disconnect exchange');
+    } finally {
+      setDisconnectingExchange(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Exchange</h2>
+          <p className="text-gray-600">
+            Loading available exchanges...
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Exchange</h2>
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={loadExchanges} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -146,7 +170,7 @@ export function ExchangeList({ onSelectExchange, connectedExchanges = [] }: Exch
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {availableExchanges.map((exchange) => {
+        {exchanges.map((exchange) => {
           const isConnected = connectedExchanges.includes(exchange.id);
           const isAvailable = exchange.status === 'available';
           
@@ -155,10 +179,9 @@ export function ExchangeList({ onSelectExchange, connectedExchanges = [] }: Exch
               key={exchange.id} 
               className={`relative transition-all duration-200 hover:shadow-lg ${
                 isConnected ? 'ring-2 ring-green-500 bg-green-50' : 
-                isAvailable ? 'hover:ring-2 hover:ring-blue-500 cursor-pointer' : 
-                'opacity-60 cursor-not-allowed'
+                isAvailable ? 'hover:ring-2 hover:ring-blue-500' : 
+                'opacity-60'
               }`}
-              onClick={() => isAvailable && !isConnected && setSelectedExchange(exchange)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -170,10 +193,10 @@ export function ExchangeList({ onSelectExchange, connectedExchanges = [] }: Exch
                     </div>
                   </div>
                   {isConnected && (
-                    <div className="flex items-center text-green-600">
-                      <Check className="h-5 w-5 mr-1" />
-                      <span className="text-sm font-medium">Connected</span>
-                    </div>
+                    <Badge className="bg-green-500 text-white flex items-center">
+                      <Check className="h-3 w-3 mr-1" />
+                      Connected
+                    </Badge>
                   )}
                 </div>
                 <CardDescription className="text-sm">
@@ -199,32 +222,49 @@ export function ExchangeList({ onSelectExchange, connectedExchanges = [] }: Exch
                   </div>
 
                   <div className="flex space-x-2">
-                    <Button
-                      variant={isConnected ? "outline" : "default"}
-                      size="sm"
-                      className="flex-1"
-                      disabled={!isAvailable || isConnected}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isAvailable && !isConnected) {
-                          onSelectExchange(exchange);
-                        }
-                      }}
-                    >
-                      {isConnected ? (
-                        <>
-                          <Check className="h-4 w-4 mr-1" />
-                          Connected
-                        </>
-                      ) : isAvailable ? (
-                        <>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Connect
-                        </>
-                      ) : (
-                        'Coming Soon'
-                      )}
-                    </Button>
+                    {isConnected ? (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        disabled={disconnectingExchange === exchange.id}
+                        onClick={(e) => handleDisconnect(exchange.id, e)}
+                      >
+                        {disconnectingExchange === exchange.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Disconnecting...
+                          </>
+                        ) : (
+                          <>
+                            <X className="h-4 w-4 mr-1" />
+                            Disconnect
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="flex-1"
+                        disabled={!isAvailable}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isAvailable) {
+                            onSelectExchange(exchange);
+                          }
+                        }}
+                      >
+                        {isAvailable ? (
+                          <>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Connect
+                          </>
+                        ) : (
+                          'Coming Soon'
+                        )}
+                      </Button>
+                    )}
                     
                     <Button
                       variant="outline"
@@ -244,34 +284,6 @@ export function ExchangeList({ onSelectExchange, connectedExchanges = [] }: Exch
         })}
       </div>
 
-      {selectedExchange && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold mb-4">Connect {selectedExchange.name}</h3>
-            <p className="text-gray-600 mb-4">
-              You will be redirected to {selectedExchange.name} to complete the connection process.
-            </p>
-            <div className="flex space-x-3">
-              <Button
-                onClick={() => {
-                  onSelectExchange(selectedExchange);
-                  setSelectedExchange(null);
-                }}
-                className="flex-1"
-              >
-                Continue
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setSelectedExchange(null)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

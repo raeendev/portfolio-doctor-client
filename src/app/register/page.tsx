@@ -52,7 +52,8 @@ export default function RegisterPage() {
       await register(formData.email, formData.username, formData.password);
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      const errorMessage = err.message || err.response?.data?.detail || err.response?.data?.message || 'Registration failed. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

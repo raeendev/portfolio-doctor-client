@@ -11,19 +11,19 @@ interface UpdateExchangeModalProps {
   exchangeId: string;
   onClose: () => void;
   onUpdate: () => void;
-  isUpdating?: boolean;
 }
 
 export function UpdateExchangeModal({ 
   exchangeId, 
   onClose, 
-  onUpdate, 
-  isUpdating = false 
+  onUpdate
 }: UpdateExchangeModalProps) {
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
   const [showApiSecret, setShowApiSecret] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const getExchangeName = (exchange: string) => {
     switch (exchange.toLowerCase()) {
@@ -78,16 +78,27 @@ export function UpdateExchangeModal({
     return Object.keys(newErrors).length === 0;
   };
 
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const handleUpdate = async () => {
     if (!validateForm()) return;
 
+    setIsUpdating(true);
+    setUpdateError(null);
     try {
       await exchangesApi.updateKeys(exchangeId, apiKey, apiSecret);
+      setApiKey('');
+      setApiSecret('');
+      setErrors({});
       onUpdate();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update failed:', error);
-      alert('Failed to update exchange keys');
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to update exchange keys. Please try again.';
+      setUpdateError(errorMessage);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -126,6 +137,15 @@ export function UpdateExchangeModal({
               <p className="text-sm text-gray-600">Update API credentials</p>
             </div>
           </div>
+
+          {updateError && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+              <div className="flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                {updateError}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4">
             <div>

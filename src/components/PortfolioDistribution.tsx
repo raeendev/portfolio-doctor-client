@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PortfolioAsset } from './PortfolioAssetCard';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface PortfolioDistributionProps {
   assets: PortfolioAsset[];
@@ -9,6 +10,7 @@ interface PortfolioDistributionProps {
 }
 
 export function PortfolioDistribution({ assets, totalValue }: PortfolioDistributionProps) {
+  const { t } = useLanguage();
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -56,7 +58,7 @@ export function PortfolioDistribution({ assets, totalValue }: PortfolioDistribut
   };
 
   const getTierLabel = (tier: string) => {
-    return tier.replace('_', ' ');
+    return t(`assetCard.tier.${tier.toLowerCase().replace('_', '')}`);
   };
 
   return (
@@ -64,7 +66,7 @@ export function PortfolioDistribution({ assets, totalValue }: PortfolioDistribut
       {/* Asset Distribution Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Asset Distribution</CardTitle>
+          <CardTitle>{t('portfolioDistribution.assetDistribution')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -91,7 +93,7 @@ export function PortfolioDistribution({ assets, totalValue }: PortfolioDistribut
             ))}
             {assetsWithPercentage.length > 8 && (
               <div className="text-center text-sm text-gray-500">
-                +{assetsWithPercentage.length - 8} more assets
+                {t('portfolioDistribution.moreAssets', { count: assetsWithPercentage.length - 8 })}
               </div>
             )}
           </div>
@@ -101,7 +103,7 @@ export function PortfolioDistribution({ assets, totalValue }: PortfolioDistribut
       {/* Tier Distribution */}
       <Card>
         <CardHeader>
-          <CardTitle>Portfolio by Tier</CardTitle>
+          <CardTitle>{t('portfolioDistribution.portfolioByTier')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -131,7 +133,7 @@ export function PortfolioDistribution({ assets, totalValue }: PortfolioDistribut
                     />
                   </div>
                   <div className="text-xs text-gray-500">
-                    {tierAssets.length} asset{tierAssets.length !== 1 ? 's' : ''}
+                    {tierAssets.length} {tierAssets.length !== 1 ? t('portfolioDistribution.assets') : t('portfolioDistribution.asset')}
                   </div>
                 </div>
               );

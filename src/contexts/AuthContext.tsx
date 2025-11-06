@@ -44,19 +44,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await authApi.login({ email, password });
-    const { user: userData, accessToken } = response.data;
-    
-    localStorage.setItem('accessToken', accessToken);
-    setUser(userData);
+    try {
+      const response = await authApi.login({ email, password });
+      const { user: userData, accessToken } = response.data;
+      
+      if (!accessToken || !userData) {
+        throw new Error('Invalid response from server');
+      }
+      
+      localStorage.setItem('accessToken', accessToken);
+      setUser(userData);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Login failed. Please check your credentials.';
+      throw new Error(errorMessage);
+    }
   };
 
   const register = async (email: string, username: string, password: string) => {
-    const response = await authApi.register({ email, username, password });
-    const { user: userData, accessToken } = response.data;
-    
-    localStorage.setItem('accessToken', accessToken);
-    setUser(userData);
+    try {
+      const response = await authApi.register({ email, username, password });
+      const { user: userData, accessToken } = response.data;
+      
+      if (!accessToken || !userData) {
+        throw new Error('Invalid response from server');
+      }
+      
+      localStorage.setItem('accessToken', accessToken);
+      setUser(userData);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Registration failed. Please try again.';
+      throw new Error(errorMessage);
+    }
   };
 
   const logout = () => {
