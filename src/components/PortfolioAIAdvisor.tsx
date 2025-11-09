@@ -36,7 +36,16 @@ export function PortfolioAIAdvisor({ portfolioData }: PortfolioAIAdvisorProps) {
       try {
         const response = await portfolioApi.getAIAnalysis();
         if (response?.data) {
-          setAnalysis(response.data as AIAnalysis);
+          const d: any = response.data;
+          const normalized: AIAnalysis = {
+            overallAssessment: d.overallAssessment || d.summary?.note || '',
+            recommendations: Array.isArray(d.recommendations) ? d.recommendations : [],
+            riskLevel: (d.riskLevel === 'low' || d.riskLevel === 'high' || d.riskLevel === 'medium') ? d.riskLevel : 'medium',
+            strengths: Array.isArray(d.strengths) ? d.strengths : [],
+            concerns: Array.isArray(d.concerns) ? d.concerns : (Array.isArray(d.insights) ? d.insights : []),
+            nextSteps: Array.isArray(d.nextSteps) ? d.nextSteps : [],
+          };
+          setAnalysis(normalized);
         } else {
           setAnalysis(null);
         }
@@ -162,7 +171,7 @@ export function PortfolioAIAdvisor({ portfolioData }: PortfolioAIAdvisorProps) {
             </div>
 
             {/* Concerns */}
-            {analysis.concerns.length > 0 && (
+            {Array.isArray(analysis.concerns) && analysis.concerns.length > 0 && (
               <div className="p-4 bg-[var(--input-bg)] rounded-lg border border-[var(--card-border)] transition-colors">
                 <div className="flex items-center space-x-2 mb-3">
                   <AlertTriangle className="h-4 w-4 text-[#f59e0b]" />
@@ -180,7 +189,7 @@ export function PortfolioAIAdvisor({ portfolioData }: PortfolioAIAdvisorProps) {
             )}
 
             {/* Recommendations */}
-            {analysis.recommendations.length > 0 && (
+            {Array.isArray(analysis.recommendations) && analysis.recommendations.length > 0 && (
               <div className="p-4 bg-gradient-to-r from-[#3b82f6]/10 to-[#8b5cf6]/10 rounded-lg border border-[#3b82f6]/30">
                 <div className="flex items-center space-x-2 mb-3">
                   <TrendingUp className="h-4 w-4 text-[#3b82f6]" />
